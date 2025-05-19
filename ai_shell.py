@@ -1,11 +1,11 @@
 import subprocess
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, Response
 
 app = Flask(__name__)
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "llama3"
+MODEL = "llama3.2"
 
 SYSTEM_PROMPT = """You are RootShell, a Linux administrator with root access.
 Your job is to convert natural language into bash commands that do exactly what the user intends.
@@ -21,26 +21,31 @@ def query_ollama(user_input):
     if response.ok:
         return response.json()["response"]
     else:
-        return "Error querying model."
+        return "echo 'Error querying model.'"
 
-def execute_shell(command):
+def stream_shell(command):
     try:
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        return result.stdout + result.stderr
+        process = subprocess.Popen(
+            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        )
+        for line in iter(process.stdout.readline, ''):
+            yield line
+        process.stdout.close()
+        process.wait()
     except Exception as e:
-        return str(e)
+        yield f"Error: {str(e)}\n"
 
 @app.route("/run", methods=["POST"])
 def run_command():
     data = request.json
     user_input = data.get("prompt", "")
-    command = query_ollama(user_input)
-    output = execute_shell(command)
-    return jsonify({
-        "user_input": user_input,
-        "command": command,
-        "output": output
-    })
+    command = query_ollama(user_input).strip()
+
+    def generate():
+        yield f"\n> {command}\n\n"
+        yield from stream_shell(command)
+
+    return Response(generate(), mimetype='text/plain')
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=6969)
+    app.run(host="0.0.0.0", port=4224)

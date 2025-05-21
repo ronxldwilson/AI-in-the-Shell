@@ -66,7 +66,7 @@ sudo apt update && sudo apt install nginx -y && sudo systemctl start nginx
 4. Run the Flask server:
 
    ```bash
-   python3 ai_shell.py
+   python3 rootshell_combined.py
    ```
 
 ---

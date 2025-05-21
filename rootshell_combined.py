@@ -1,6 +1,8 @@
 import subprocess
 import threading
 import requests
+import platform
+import time
 from flask import Flask, request, Response
 
 # --- Flask Server Part ---
@@ -11,6 +13,24 @@ MODEL = "llama3.2"
 SYSTEM_PROMPT = """You are RootShell, a Linux administrator with root access.
 Your job is to convert natural language into bash commands that do exactly what the user intends.
 Only return shell commands. Do not explain or ask for confirmation."""
+
+def is_ollama_running():
+    try:
+        r = requests.get("http://localhost:11434/api/tags", timeout=2)
+        return r.ok
+    except Exception:
+        return False
+
+def start_ollama_in_new_terminal():
+    print("🔄 Ollama not running. Starting it in a new terminal...")
+    if platform.system() == "Windows":
+        subprocess.Popen(["start", "cmd", "/k", "ollama serve"], shell=True)
+    elif platform.system() == "Darwin":  # macOS
+        subprocess.Popen(["osascript", "-e", 'tell app "Terminal" to do script "ollama serve"'])
+    elif platform.system() == "Linux":
+        subprocess.Popen(["x-terminal-emulator", "-e", "ollama serve"])
+    else:
+        print("❌ Unsupported platform. Please start `ollama serve` manually.")
 
 def query_ollama(user_input):
     payload = {
@@ -51,7 +71,7 @@ def run_command():
 
     return Response(generate(), mimetype='text/plain')
 
-# --- CLI Interface Part ---
+# --- CLI Interface ---
 SERVER_URL = "http://localhost:4224/run"
 
 def cli_interface():
@@ -61,30 +81,26 @@ def cli_interface():
         if prompt.lower() in ("exit", "quit"):
             break
         try:
-            response = requests.post(
-                SERVER_URL,
-                json={"prompt": prompt},
-                stream=True
-            )
+            response = requests.post(SERVER_URL, json={"prompt": prompt}, stream=True)
             if response.ok:
                 for line in response.iter_lines(decode_unicode=True):
                     print(line)
             else:
-                print(f" Error: {response.status_code} - {response.text}")
+                print(f"Error: {response.status_code} - {response.text}")
         except KeyboardInterrupt:
             break
         except Exception as e:
-            print(f" Exception: {str(e)}")
+            print(f"Exception: {str(e)}")
 
 # --- Main Entry ---
 if __name__ == "__main__":
-    # Start Flask server in a background thread
+    if not is_ollama_running():
+        start_ollama_in_new_terminal()
+        print("⏳ Waiting for Ollama to boot up...")
+        time.sleep(5)
+
     server_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=4224), daemon=True)
     server_thread.start()
 
-    # Wait a bit to let the server start
-    import time
     time.sleep(1)
-
-    # Start the CLI
     cli_interface()

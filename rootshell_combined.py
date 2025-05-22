@@ -27,6 +27,39 @@ SYSTEM_PROMPT = """You are RootShell, a Linux administrator with root access.
 Your job is to convert natural language into bash commands that do exactly what the user intends.
 Only return shell commands. Do not explain or ask for confirmation."""
 
+TASK_PROMPT = """You are a proactive Linux admin. Think about a useful maintenance, monitoring, or security task to do on a Linux system right now. 
+Be creative but reasonable. Only return a **single sentence** describing the task to be done. Do not explain or elaborate.
+"""
+
+def generate_task():
+    payload = {
+        "model": MODEL,
+        "prompt": TASK_PROMPT,
+        "stream": False
+    }
+    try:
+        response = requests.post(OLLAMA_URL, json=payload)
+        if response.ok:
+            return response.json()["response"].strip()
+        else:
+            return "Check system uptime."
+    except Exception as e:
+        return f"Check failed task gen: {e}"
+
+def autonomous_loop():
+    while True:
+        task = generate_task()
+        log_print(f"\n🤖 Agent A suggested task: {task}")
+        
+        # Ask Agent B (RootShell) to convert it to a command
+        command = query_ollama(task).strip()
+        log_print(f"> RootShell command: {command}")
+
+        for line in stream_shell(command):
+            log_print(line.strip())
+
+        time.sleep(120)  # wait before next task
+
 def is_ollama_running():
     try:
         r = requests.get("http://localhost:11434/api/tags", timeout=2)
@@ -76,7 +109,7 @@ def stream_shell(command):
 def run_command():
     data = request.json
     user_input = data.get("prompt", "")
-    log_print(f"User input (from API): {user_input}")  
+    # log_print(f"User input (from API): {user_input}")  
     command = query_ollama(user_input).strip()
 
     def generate():
@@ -110,15 +143,19 @@ def cli_interface():
         except Exception as e:
             log_print(f"Exception: {str(e)}")
 
-# --- Main Entry ---
 if __name__ == "__main__":
     if not is_ollama_running():
         start_ollama_in_new_terminal()
         log_print("⏳ Waiting for Ollama to boot up...")
         time.sleep(5)
 
+    # Start Flask server
     server_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=4224), daemon=True)
     server_thread.start()
+
+    # Start autonomous agent
+    auto_thread = threading.Thread(target=autonomous_loop, daemon=True)
+    auto_thread.start()
 
     time.sleep(1)
     cli_interface()

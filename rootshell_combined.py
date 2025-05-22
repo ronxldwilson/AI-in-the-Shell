@@ -4,6 +4,19 @@ import requests
 import platform
 import time
 from flask import Flask, request, Response
+from datetime import datetime
+
+LOG_FILE = "history.log"
+
+def log_print(*args, **kwargs):
+    message = " ".join(str(arg) for arg in args)
+    timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+    log_entry = f"{timestamp} {message}\n"
+
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(log_entry)
+
+    print(*args, **kwargs)
 
 # --- Flask Server Part ---
 app = Flask(__name__)
@@ -22,7 +35,7 @@ def is_ollama_running():
         return False
 
 def start_ollama_in_new_terminal():
-    print("🔄 Ollama not running. Starting it in a new terminal...")
+    log_print("🔄 Ollama not running. Starting it in a new terminal...")
     if platform.system() == "Windows":
         subprocess.Popen(["start", "cmd", "/k", "ollama serve"], shell=True)
     elif platform.system() == "Darwin":  # macOS
@@ -30,7 +43,7 @@ def start_ollama_in_new_terminal():
     elif platform.system() == "Linux":
         subprocess.Popen(["x-terminal-emulator", "-e", "ollama serve"])
     else:
-        print("❌ Unsupported platform. Please start `ollama serve` manually.")
+        log_print("❌ Unsupported platform. Please start `ollama serve` manually.")
 
 def query_ollama(user_input):
     payload = {
@@ -63,11 +76,15 @@ def stream_shell(command):
 def run_command():
     data = request.json
     user_input = data.get("prompt", "")
+    log_print(f"User input (from API): {user_input}")  
     command = query_ollama(user_input).strip()
 
     def generate():
-        yield f"\n> {command}\n\n"
-        yield from stream_shell(command)
+        log_print(f"\n> {command}\n")  
+        for line in stream_shell(command):
+            log_print(line.strip())     # Log each line from shell output
+            yield line
+
 
     return Response(generate(), mimetype='text/plain')
 
@@ -75,28 +92,29 @@ def run_command():
 SERVER_URL = "http://localhost:4224/run"
 
 def cli_interface():
-    print("RootShell AI Interface. Type 'exit' to quit.\n")
+    log_print("RootShell AI Interface. Type 'exit' to quit.\n")
     while True:
         prompt = input("> ")
         if prompt.lower() in ("exit", "quit"):
             break
+        log_print(f"User input: {prompt}")  
         try:
             response = requests.post(SERVER_URL, json={"prompt": prompt}, stream=True)
             if response.ok:
                 for line in response.iter_lines(decode_unicode=True):
-                    print(line)
+                    log_print(line)
             else:
-                print(f"Error: {response.status_code} - {response.text}")
+                log_print(f"Error: {response.status_code} - {response.text}")
         except KeyboardInterrupt:
             break
         except Exception as e:
-            print(f"Exception: {str(e)}")
+            log_print(f"Exception: {str(e)}")
 
 # --- Main Entry ---
 if __name__ == "__main__":
     if not is_ollama_running():
         start_ollama_in_new_terminal()
-        print("⏳ Waiting for Ollama to boot up...")
+        log_print("⏳ Waiting for Ollama to boot up...")
         time.sleep(5)
 
     server_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=4224), daemon=True)

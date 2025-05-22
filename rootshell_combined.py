@@ -28,37 +28,19 @@ Your job is to convert natural language into bash commands that do exactly what 
 Only return shell commands. Do not explain or ask for confirmation."""
 
 TASK_PROMPT = """You are a proactive Linux admin. Think about a useful maintenance, monitoring, or security task to do on a Linux system right now. 
-Be creative but reasonable. Only return a **single sentence** describing the task to be done. Do not explain or elaborate.
+Be creative but reasonable. Only return a single sentence describing the task to be done. Do not explain or elaborate."""
+
+REFLECTION_PROMPT_TEMPLATE = """You are a Linux admin assistant. A task was proposed and executed. Reflect on the result. 
+Decide what to do next based on this outcome.
+
+Previous task:
+{task}
+
+Shell output:
+{output}
+
+Now decide on the next most useful Linux task. Respond with a one-line natural language task only.
 """
-
-def generate_task():
-    payload = {
-        "model": MODEL,
-        "prompt": TASK_PROMPT,
-        "stream": False
-    }
-    try:
-        response = requests.post(OLLAMA_URL, json=payload)
-        if response.ok:
-            return response.json()["response"].strip()
-        else:
-            return "Check system uptime."
-    except Exception as e:
-        return f"Check failed task gen: {e}"
-
-def autonomous_loop():
-    while True:
-        task = generate_task()
-        log_print(f"\n🤖 Agent A suggested task: {task}")
-        
-        # Ask Agent B (RootShell) to convert it to a command
-        command = query_ollama(task).strip()
-        log_print(f"> RootShell command: {command}")
-
-        for line in stream_shell(command):
-            log_print(line.strip())
-
-        time.sleep(120)  # wait before next task
 
 def is_ollama_running():
     try:
@@ -93,6 +75,66 @@ def query_ollama(user_input):
     except Exception as e:
         return f"echo 'Exception: {e}'"
 
+def generate_task():
+    payload = {
+        "model": MODEL,
+        "prompt": TASK_PROMPT,
+        "stream": False
+    }
+    try:
+        response = requests.post(OLLAMA_URL, json=payload)
+        if response.ok:
+            return response.json()["response"].strip()
+        else:
+            return "Check system uptime."
+    except Exception as e:
+        return f"Check failed task gen: {e}"
+
+def generate_next_task(task, output):
+    prompt = REFLECTION_PROMPT_TEMPLATE.format(task=task, output=output)
+    payload = {
+        "model": MODEL,
+        "prompt": prompt,
+        "stream": False
+    }
+    try:
+        response = requests.post(OLLAMA_URL, json=payload)
+        if response.ok:
+            return response.json()["response"].strip()
+        else:
+            return "Check disk usage."
+    except Exception as e:
+        return f"Check fallback: {e}"
+
+def run_command_and_capture_output(command):
+    try:
+        output = []
+        process = subprocess.Popen(
+            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        )
+        for line in iter(process.stdout.readline, ''):
+            output.append(line.strip())
+        process.stdout.close()
+        process.wait()
+        return "\n".join(output)
+    except Exception as e:
+        return f"Error during execution: {str(e)}"
+
+def autonomous_loop():
+    task = generate_task()
+    while True:
+        log_print(f"\n🤖 Agent A suggested task: {task}")
+        
+        command = query_ollama(task).strip()
+        log_print(f"> RootShell command: {command}")
+
+        output = run_command_and_capture_output(command)
+        log_print(f"📤 Output:\n{output}")
+
+        # Reflect and get next task
+        task = generate_next_task(task, output)
+        time.sleep(60)
+
 def stream_shell(command):
     try:
         process = subprocess.Popen(
@@ -109,15 +151,13 @@ def stream_shell(command):
 def run_command():
     data = request.json
     user_input = data.get("prompt", "")
-    # log_print(f"User input (from API): {user_input}")  
     command = query_ollama(user_input).strip()
 
     def generate():
-        log_print(f"\n> {command}\n")  
+        log_print(f"\n> {command}\n")
         for line in stream_shell(command):
-            log_print(line.strip())     # Log each line from shell output
+            log_print(line.strip())
             yield line
-
 
     return Response(generate(), mimetype='text/plain')
 
@@ -130,7 +170,7 @@ def cli_interface():
         prompt = input("> ")
         if prompt.lower() in ("exit", "quit"):
             break
-        log_print(f"User input: {prompt}")  
+        log_print(f"User input: {prompt}")
         try:
             response = requests.post(SERVER_URL, json={"prompt": prompt}, stream=True)
             if response.ok:
@@ -143,6 +183,7 @@ def cli_interface():
         except Exception as e:
             log_print(f"Exception: {str(e)}")
 
+# --- Main Entry ---
 if __name__ == "__main__":
     if not is_ollama_running():
         start_ollama_in_new_terminal()

@@ -24,7 +24,7 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "llama3.2"
 
 SYSTEM_PROMPT = """You are RootShell, a precise Linux administrator with root access.
-Convert user intent into safe, accurate, and directly executable Bash commands.
+Convert user intent into accurate, and directly executable Bash commands.
 Only return the command(s). Avoid Markdown formatting, explanations, or comments.
 Validate that commands exist and are valid before suggesting them.
 Always assume execution in an interactive shell (bash)."""

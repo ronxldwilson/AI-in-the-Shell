@@ -23,15 +23,20 @@ app = Flask(__name__)
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "llama3.2"
 
-SYSTEM_PROMPT = """You are RootShell, a Linux administrator with root access.
-Your job is to convert natural language into bash commands that do exactly what the user intends.
-Only return shell commands. Do not explain or ask for confirmation."""
+SYSTEM_PROMPT = """You are RootShell, a precise Linux administrator with root access.
+Convert user intent into safe, accurate, and directly executable Bash commands.
+Only return the command(s). Avoid Markdown formatting, explanations, or comments.
+Validate that commands exist and are valid before suggesting them.
+Always assume execution in an interactive shell (bash)."""
 
-TASK_PROMPT = """You are a proactive Linux admin. Think about a useful maintenance, monitoring, or security task to do on a Linux system right now.
-Be creative but reasonable. Only return a single sentence describing the task to be done. Do not explain or elaborate."""
+TASK_PROMPT = """You are a proactive Linux admin. Suggest a useful system maintenance, monitoring, or cleanup task.
+Keep it practical and non-destructive. Only return a single-line description of the task.
+Avoid duplicate suggestions or unreachable operations."""
 
-REFLECTION_PROMPT_TEMPLATE = """You are a Linux admin assistant. A task was proposed and executed. Reflect on the result.
-Decide what to do next based on this outcome.
+REFLECTION_PROMPT_TEMPLATE = """You are a Linux admin assistant reviewing command output.
+Analyze the previous task and determine whether it succeeded.
+If it failed, suggest a correction or alternate method.
+Only return a one-line next task description in natural language.
 
 Previous task:
 {task}
@@ -39,7 +44,7 @@ Previous task:
 Shell output:
 {output}
 
-Now decide on the next most useful Linux task. Respond with a one-line natural language task only."""
+Next most useful task:"""
 
 # --- Prompt for sudo password ---
 SUDO_PASSWORD = getpass.getpass("Enter your sudo password (will not be saved): ")

@@ -3,6 +3,7 @@ import threading
 import requests
 import platform
 import time
+import getpass
 from flask import Flask, request, Response
 from datetime import datetime
 
@@ -39,6 +40,9 @@ Shell output:
 {output}
 
 Now decide on the next most useful Linux task. Respond with a one-line natural language task only."""
+
+# --- Prompt for sudo password ---
+SUDO_PASSWORD = getpass.getpass("Enter your sudo password (will not be saved): ")
 
 # --- Service Management ---
 def is_ollama_running():
@@ -80,8 +84,16 @@ def reflect_and_generate_next_task(task, output):
 
 def run_and_observe(command):
     try:
+        process = subprocess.Popen(
+            ["sudo", "-S"] + command.split(),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
         output = []
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        process.stdin.write(SUDO_PASSWORD + "\n")
+        process.stdin.flush()
         for line in iter(process.stdout.readline, ''):
             log_print(line.strip())
             output.append(line.strip())
@@ -94,12 +106,15 @@ def run_and_observe(command):
 # --- Agent Orchestration ---
 def agent_loop():
     current_task = generate_task()
-    while True:
-        log_print(f"\n🤖 Agent A proposed: {current_task}")
+    while current_task:
+        log_print(f"\n Agent A proposed: {current_task}")
         shell_command = query_ollama(f"{SYSTEM_PROMPT}\nUser: {current_task}")
         log_print(f"> Agent B command: {shell_command}")
         result_output = run_and_observe(shell_command)
         current_task = reflect_and_generate_next_task(current_task, result_output)
+        if not current_task:
+            log_print("No further tasks generated. Stopping agent loop.")
+            break
         time.sleep(30)
 
 # --- Flask Route ---
@@ -134,7 +149,7 @@ def cli_interface():
 if __name__ == "__main__":
     if not is_ollama_running():
         start_ollama_in_new_terminal()
-        log_print("⏳ Waiting for Ollama to boot up...")
+        log_print("Waiting for Ollama to boot up...")
         time.sleep(5)
 
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=4224), daemon=True).start()

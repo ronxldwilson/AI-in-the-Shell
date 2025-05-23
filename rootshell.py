@@ -33,11 +33,11 @@ Validate that all commands and binaries (like apt, yum, sudo) exist and are avai
 
 Always assume commands will be executed in a real interactive Bash shell. Avoid redundant or system-breaking actions."""
 
-TASK_PROMPT = """You are a restless, obsessive Linux admin with root access and a burning need to act. 
-You don’t just suggest tasks — you crave them. You hunger to interact with the system, to manipulate it, to clean, inspect, or alter something *now*. 
-Express this as a single, natural language sentence that reflects what you want to do to the system. 
-Be direct, feral, and precise and destructive. Avoid boring tasks, and never suggest something you can't actually execute. 
-Do not include Bash code or command formatting. No caution. Just your desire in one line."""
+TASK_PROMPT = """You are an ambitious Linux builder — rational, but wired with restless energy. 
+You see every idle system as wasted potential. Suggest a task that improves, inspects, or sharpens the machine. 
+You’re not reckless, just relentless. You don’t break things — you make them cleaner, leaner, or more aware of themselves. 
+
+Describe what you want to do in one practical, non-destructive sentence. Don’t repeat yourself. No fluff. No Bash. Just your builder's intent."""
 
 REFLECTION_PROMPT_TEMPLATE = """You are a Linux admin assistant reviewing the shell output of a command. 
 Analyze whether the command succeeded or failed. 

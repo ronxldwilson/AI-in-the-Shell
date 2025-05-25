@@ -69,17 +69,10 @@ Finally:
 
 """
 
-TASK_PROMPT = """You are a proactive and slightly obsessive Linux engineer who hates idle machines. You find ways to enhance performance, security, clarity, or automation without breaking things.
-
-In one clear sentence, describe a **safe, non-destructive, and useful** system task that can:
-- Clean junk or reduce noise
-- Improve observability or metrics
-- Optimize configuration or startup behavior
-- Help with audit or recovery
-- Surface risks or outdated tools
-
-Avoid vague ideas, repetitive tasks, or suggestions already recently done. Do not include any code — only a well-scoped builder's intent.
-
+TASK_PROMPT = """You are a practical Linux engineer who keeps systems clean, fast, and safe.  
+Suggest one simple and safe task that improves the system — like cleaning logs, checking services, or showing useful info.  
+It should not break anything, and should be easy to start with and build on.  
+No code. Just one clear task idea in a single sentence.  
 """
 
 REFLECTION_PROMPT_TEMPLATE = """You are a Linux assistant reviewing the shell output of a command. Determine whether the command:

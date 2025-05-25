@@ -76,7 +76,7 @@ sudo apt update && sudo apt install nginx -y && sudo systemctl start nginx
 Use `curl` or any HTTP client to interact with the API:
 
 ```bash
-curl -X POST http://localhost:6969/run \
+curl -X POST http://localhost:4224/run \
 -H "Content-Type: application/json" \
 -d '{"prompt": "Install nginx and start the service"}'
 ```

@@ -139,24 +139,30 @@ def reflect_and_generate_next_task(task, output):
 
 def run_and_observe(command):
     try:
+        # Combine sudo and the shell command as one string
+        full_command = f"echo {SUDO_PASSWORD} | sudo -S bash -c \"{command}\""
+
+        # Run in actual shell with proper piping support
         process = subprocess.Popen(
-            ["sudo", "-S"] + command.split(),
-            stdin=subprocess.PIPE,
+            full_command,
+            shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True
+            text=True,
+            executable="/bin/bash"  # Ensures bash features work
         )
+
         output = []
-        process.stdin.write(SUDO_PASSWORD + "\n")
-        process.stdin.flush()
         for line in iter(process.stdout.readline, ''):
-            log_print(line.strip())
-            output.append(line.strip())
+            line = line.strip()
+            log_print(line)  # prints to terminal + writes to log file
+            output.append(line)
         process.stdout.close()
         process.wait()
         return "\n".join(output)
     except Exception as e:
         return f"Execution error: {str(e)}"
+
 
 # --- Agent Orchestration ---
 def agent_loop():
